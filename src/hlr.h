@@ -56,6 +56,11 @@ struct hlr {
 	struct llist_head ss_sessions;
 
 	bool store_imei;
+
+	bool create_subscr_on_demand;
+	bool create_subscr_on_demand_nam_cs;
+	bool create_subscr_on_demand_nam_ps;
+	int create_subscr_on_demand_rand_msisdn_len;
 };
 
 extern struct hlr *g_hlr;

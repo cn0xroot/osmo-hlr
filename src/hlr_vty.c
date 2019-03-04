@@ -76,6 +76,28 @@ static int config_write_hlr(struct vty *vty)
 		vty_out(vty, " store-imei%s", VTY_NEWLINE);
 	if (g_hlr->db_file_path && strcmp(g_hlr->db_file_path, HLR_DEFAULT_DB_FILE_PATH))
 		vty_out(vty, " database %s%s", g_hlr->db_file_path, VTY_NEWLINE);
+	if (g_hlr->create_subscr_on_demand) {
+		if (g_hlr->create_subscr_on_demand_rand_msisdn_len) {
+			const char *nam;
+			bool nam_cs = g_hlr->create_subscr_on_demand_nam_cs;
+			bool nam_ps = g_hlr->create_subscr_on_demand_nam_ps;
+
+			if (!nam_cs && !nam_ps)
+				nam = "none";
+			else if (!nam_cs && nam_ps)
+				nam = "ps";
+			else if (nam_cs && !nam_ps)
+				nam = "cs";
+			else
+				nam = "both";
+
+			vty_out(vty, " subscriber-create-on-demand %i %s%s",
+				g_hlr->create_subscr_on_demand_rand_msisdn_len, nam, VTY_NEWLINE);
+
+		} else {
+			vty_out(vty, " subscriber-create-on-demand no-extension%s", VTY_NEWLINE);
+		}
+	}
 	return CMD_SUCCESS;
 }
 
@@ -336,6 +358,55 @@ DEFUN(cfg_no_store_imei, cfg_no_store_imei_cmd,
 	return CMD_SUCCESS;
 }
 
+DEFUN(cfg_subscr_create_on_demand_random_msisdn, cfg_subscr_create_on_demand_random_msisdn_cmd,
+	"subscriber-create-on-demand <3-15> (none|cs|ps|both)",
+	"Make a new record when a subscriber is first seen.\n"
+	"Digits for an automatically assigned MSISDN (telephone number).\n"
+	"Do not allow any NAM (Numeric Assignment Module) by default.\n"
+	"Allow access to circuit switched NAM by default.\n"
+	"Allow access to packet switched NAM by default.\n"
+	"Allow access to circuit and packet switched NAM by default.\n")
+{
+	bool nam_cs = false;
+	bool nam_ps = false;
+
+	if (strcmp(argv[1], "cs") == 0) {
+		nam_cs = true;
+	} else if (strcmp(argv[1], "ps") == 0) {
+		nam_ps = true;
+	} else if (strcmp(argv[1], "both") == 0) {
+		nam_cs = true;
+		nam_ps = true;
+	}
+
+	g_hlr->create_subscr_on_demand = true;
+	g_hlr->create_subscr_on_demand_rand_msisdn_len = atoi(argv[0]);
+	g_hlr->create_subscr_on_demand_nam_cs = nam_cs;
+	g_hlr->create_subscr_on_demand_nam_ps = nam_ps;
+
+	return CMD_SUCCESS;
+}
+
+DEFUN(cfg_subscr_create_on_demand, cfg_subscr_create_on_demand_extension_cmd,
+	"subscriber-create-on-demand no-extension",
+	"Make a new record when a subscriber is first seen.\n"
+	"Do not automatically assign extension to created subscribers.\n")
+{
+	g_hlr->create_subscr_on_demand = true;
+	g_hlr->create_subscr_on_demand_rand_msisdn_len = 0;
+	g_hlr->create_subscr_on_demand_nam_cs = false;
+	g_hlr->create_subscr_on_demand_nam_ps = false;
+	return CMD_SUCCESS;
+}
+
+DEFUN(cfg_no_subscr_create_on_demand, cfg_no_subscr_create_on_demand_cmd,
+	"no subscriber-create-on-demand",
+	"Do not make a new record when a subscriber is first seen.\n")
+{
+	g_hlr->create_subscr_on_demand = false;
+	return CMD_SUCCESS;
+}
+
 /***********************************************************************
  * Common Code
  ***********************************************************************/
@@ -404,6 +475,9 @@ void hlr_vty_init(const struct log_info *cat)
 	install_element(HLR_NODE, &cfg_ncss_guard_timeout_cmd);
 	install_element(HLR_NODE, &cfg_store_imei_cmd);
 	install_element(HLR_NODE, &cfg_no_store_imei_cmd);
+	install_element(HLR_NODE, &cfg_subscr_create_on_demand_random_msisdn_cmd);
+	install_element(HLR_NODE, &cfg_subscr_create_on_demand_extension_cmd);
+	install_element(HLR_NODE, &cfg_no_subscr_create_on_demand_cmd);
 
 	hlr_vty_subscriber_init();
 }

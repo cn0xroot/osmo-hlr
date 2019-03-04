@@ -34,6 +34,7 @@
 #include <osmocom/ctrl/control_vty.h>
 #include <osmocom/gsm/apn.h>
 #include <osmocom/gsm/gsm48_ie.h>
+#include <osmocom/gsm/gsm_utils.h>
 
 #include "db.h"
 #include "hlr.h"
@@ -148,6 +149,56 @@ osmo_hlr_subscriber_update_notify(struct hlr_subscriber *subscr)
 	}
 }
 
+static int subscr_create_on_demand(const char *imsi)
+{
+	uint8_t rand_buf[15];
+	char msisdn[15 + 1];
+	int i, rc;
+	int rand_msisdn_len = g_hlr->create_subscr_on_demand_rand_msisdn_len;
+	bool nam_cs = g_hlr->create_subscr_on_demand_nam_cs;
+	bool nam_ps = g_hlr->create_subscr_on_demand_nam_ps;
+
+	if (!g_hlr->create_subscr_on_demand)
+		return -1;
+	if (db_subscr_exists_by_imsi(g_hlr->dbc, imsi) == 0)
+		return -1;
+
+	LOGP(DMAIN, LOGL_INFO, "IMSI='%s': Creating subscriber on demand\n", imsi);
+	rc = db_subscr_create(g_hlr->dbc, imsi, nam_cs, nam_ps);
+	if (rc) {
+		LOGP(DMAIN, LOGL_ERROR, "Failed to create subscriber on demand (rc=%d): IMSI='%s'\n", rc, imsi);
+		return rc;
+	}
+
+	/* Generate a random unique MSISDN */
+	if (rand_msisdn_len) {
+		while (1) {
+			rc = osmo_get_rand_id(rand_buf, rand_msisdn_len);
+			if (rc) /* Keep trying until we get some result */
+				continue;
+
+			/* Shift 0x00 ... 0xff range to 30 ... 39 (ASCII numbers) */
+			for (i = 0; i < rand_msisdn_len; i++)
+				msisdn[i] = 48 + (rand_buf[i] % 10);
+			msisdn[i] = '\0';
+
+			/* Ensure there is no subscriber with such MSISDN */
+			if (db_subscr_exists_by_msisdn(g_hlr->dbc, msisdn))
+				break;
+		}
+
+		/* Update MSISDN of the new (just allocated) subscriber */
+		rc = db_subscr_update_msisdn_by_imsi(g_hlr->dbc, imsi, msisdn);
+		if (rc) {
+			LOGP(DMAIN, LOGL_ERROR, "IMSI='%s': Failed to assign MSISDN='%s' (rc=%d)\n", imsi, msisdn, rc);
+			return rc;
+		}
+		LOGP(DMAIN, LOGL_INFO, "IMSI='%s': Successfully assigned MSISDN='%s'\n", imsi, msisdn);
+	}
+
+	return 0;
+}
+
 /***********************************************************************
  * Send Auth Info handling
  ***********************************************************************/
@@ -160,6 +211,8 @@ static int rx_send_auth_info(struct osmo_gsup_conn *conn,
 	struct osmo_gsup_message gsup_out;
 	struct msgb *msg_out;
 	int rc;
+
+	subscr_create_on_demand(gsup->imsi);
 
 	/* initialize return message structure */
 	memset(&gsup_out, 0, sizeof(gsup_out));
@@ -291,6 +344,8 @@ static int rx_upd_loc_req(struct osmo_gsup_conn *conn,
 	}
 	llist_add(&luop->list, &g_lu_ops);
 
+	subscr_create_on_demand(gsup->imsi);
+
 	/* Roughly follwing "Process Update_Location_HLR" of TS 09.02 */
 
 	/* check if subscriber is known at all */
@@ -414,6 +469,8 @@ static int rx_check_imei_req(struct osmo_gsup_conn *conn, const struct osmo_gsup
 		gsup_send_err_reply(conn, gsup->imsi, gsup->message_type, GMM_CAUSE_INV_MAND_INFO);
 		return -1;
 	}
+
+	subscr_create_on_demand(gsup->imsi);
 
 	/* Save in DB if desired */
 	if (g_hlr->store_imei) {
