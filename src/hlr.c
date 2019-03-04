@@ -148,6 +148,18 @@ osmo_hlr_subscriber_update_notify(struct hlr_subscriber *subscr)
 	}
 }
 
+static void subscr_create_on_demand(const char *imsi) {
+	int rc;
+
+	if (!g_hlr->create_subscr_on_demand || db_subscr_exists_by_imsi(g_hlr->dbc, imsi) == 0)
+		return;
+
+	LOGP(DMAIN, LOGL_INFO, "IMSI='%s': Creating subscriber on demand\n", imsi);
+	rc = db_subscr_create(g_hlr->dbc, imsi, 0, 0);
+	if (rc)
+		LOGP(DMAIN, LOGL_ERROR, "Failed to create subscriber on demand (rc=%d): IMSI='%s'\n", rc, imsi);
+}
+
 /***********************************************************************
  * Send Auth Info handling
  ***********************************************************************/
@@ -160,6 +172,8 @@ static int rx_send_auth_info(struct osmo_gsup_conn *conn,
 	struct osmo_gsup_message gsup_out;
 	struct msgb *msg_out;
 	int rc;
+
+	subscr_create_on_demand(gsup->imsi);
 
 	/* initialize return message structure */
 	memset(&gsup_out, 0, sizeof(gsup_out));
@@ -290,6 +304,8 @@ static int rx_upd_loc_req(struct osmo_gsup_conn *conn,
 		break;
 	}
 	llist_add(&luop->list, &g_lu_ops);
+
+	subscr_create_on_demand(gsup->imsi);
 
 	/* Roughly follwing "Process Update_Location_HLR" of TS 09.02 */
 

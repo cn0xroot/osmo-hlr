@@ -325,6 +325,23 @@ DEFUN(cfg_no_store_imei, cfg_no_store_imei_cmd,
 	return CMD_SUCCESS;
 }
 
+DEFUN(cfg_subscr_create_on_demand, cfg_subscr_create_on_demand_cmd,
+	"subscriber-create-on-demand",
+	"Make a new record when a subscriber is first seen. If you enable this feature, you must also enforce checking"
+	" the IMEI in your MSC (OsmoMSC: 'check-imei-rqd 1').")
+{
+	g_hlr->create_subscr_on_demand = true;
+	return CMD_SUCCESS;
+}
+
+DEFUN(cfg_no_subscr_create_on_demand, cfg_no_subscr_create_on_demand_cmd,
+	"no subscriber-create-on-demand",
+	"Do not make a new record when a subscriber is first seen.")
+{
+	g_hlr->create_subscr_on_demand = false;
+	return CMD_SUCCESS;
+}
+
 /***********************************************************************
  * Common Code
  ***********************************************************************/
@@ -391,6 +408,8 @@ void hlr_vty_init(const struct log_info *cat)
 	install_element(HLR_NODE, &cfg_ncss_guard_timeout_cmd);
 	install_element(HLR_NODE, &cfg_store_imei_cmd);
 	install_element(HLR_NODE, &cfg_no_store_imei_cmd);
+	install_element(HLR_NODE, &cfg_subscr_create_on_demand_cmd);
+	install_element(HLR_NODE, &cfg_no_subscr_create_on_demand_cmd);
 
 	hlr_vty_subscriber_init();
 }
