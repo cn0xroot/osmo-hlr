@@ -342,6 +342,26 @@ DEFUN(cfg_no_subscr_create_on_demand, cfg_no_subscr_create_on_demand_cmd,
 	return CMD_SUCCESS;
 }
 
+DEFUN(cfg_lu_ignore_nam_cs, cfg_lu_ignore_nam_cs_cmd,
+	"lu-ignore-nam-cs",
+	"Allow subscribers to do the LU (Location Update) for the CS domain, even if they should not have access to it."
+	" OsmoHLR will do the CS domain check again after the LU, during the Check IMEI procedure, and pretend that the"
+	" IMEI is not allowed on the network if the CS domain is disabled for the subscriber. This is needed to make"
+	" store-imei work with subscriber-create-on-demand. ONLY ENABLE TOGETHER WITH ENFORCED IMEI CHECKING IN YOUR"
+	" MSC! (OsmoMSC: 'check-imei-rqd 1')")
+{
+	g_hlr->lu_ignore_nam_cs = true;
+	return CMD_SUCCESS;
+}
+
+DEFUN(cfg_no_lu_ignore_nam_cs, cfg_no_lu_ignore_nam_cs_cmd,
+	"no lu-ignore-nam-cs",
+	"Only allow LU (Location Update) for the CS domain, if the subscriber has access to it.")
+{
+	g_hlr->lu_ignore_nam_cs = false;
+	return CMD_SUCCESS;
+}
+
 /***********************************************************************
  * Common Code
  ***********************************************************************/
@@ -410,6 +430,8 @@ void hlr_vty_init(const struct log_info *cat)
 	install_element(HLR_NODE, &cfg_no_store_imei_cmd);
 	install_element(HLR_NODE, &cfg_subscr_create_on_demand_cmd);
 	install_element(HLR_NODE, &cfg_no_subscr_create_on_demand_cmd);
+	install_element(HLR_NODE, &cfg_lu_ignore_nam_cs_cmd);
+	install_element(HLR_NODE, &cfg_no_lu_ignore_nam_cs_cmd);
 
 	hlr_vty_subscriber_init();
 }

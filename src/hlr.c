@@ -320,8 +320,15 @@ static int rx_upd_loc_req(struct osmo_gsup_conn *conn,
 	/* Check if subscriber is generally permitted on CS or PS
 	 * service (as requested) */
 	if (!luop->is_ps && !luop->subscr.nam_cs) {
-		lu_op_tx_error(luop, GMM_CAUSE_PLMN_NOTALLOWED);
-		return 0;
+		if (g_hlr->lu_ignore_nam_cs)
+			/* Subscriber will be kicked later in the IMEI check, which the operator must enable together
+			 * with lu-ignore-nam-cs. See rx_check_imei_req() below. */
+			LOGP(DMAIN, LOGL_DEBUG, "LU REQ: subscriber not allowed for CS, but allowing anyway"
+						" (lu-ignore-nam-cs)");
+		else {
+			lu_op_tx_error(luop, GMM_CAUSE_PLMN_NOTALLOWED);
+			return 0;
+		}
 	} else if (luop->is_ps && !luop->subscr.nam_ps) {
 		lu_op_tx_error(luop, GMM_CAUSE_GPRS_NOTALLOWED);
 		return 0;
@@ -413,6 +420,7 @@ static int gsup_send_err_reply(struct osmo_gsup_conn *conn, const char *imsi,
 
 static int rx_check_imei_req(struct osmo_gsup_conn *conn, const struct osmo_gsup_message *gsup)
 {
+	struct hlr_subscriber subscr;
 	struct osmo_gsup_message gsup_reply = {0};
 	struct msgb *msg_out;
 	char imei[GSM23003_IMEI_NUM_DIGITS+1] = {0};
@@ -431,6 +439,12 @@ static int rx_check_imei_req(struct osmo_gsup_conn *conn, const struct osmo_gsup
 		return -1;
 	}
 
+	/* Get subscriber */
+	if (db_subscr_get_by_imsi(g_hlr->dbc, gsup->imsi, &subscr) < 0) {
+		gsup_send_err_reply(conn, gsup->imsi, gsup->message_type, GMM_CAUSE_INV_MAND_INFO);
+		return -1;
+	}
+
 	/* Save in DB if desired */
 	if (g_hlr->store_imei) {
 		LOGP(DAUC, LOGL_DEBUG, "IMSI='%s': storing IMEI = %s\n", gsup->imsi, imei);
@@ -438,18 +452,21 @@ static int rx_check_imei_req(struct osmo_gsup_conn *conn, const struct osmo_gsup
 			gsup_send_err_reply(conn, gsup->imsi, gsup->message_type, GMM_CAUSE_INV_MAND_INFO);
 			return -1;
 		}
-	} else {
-		/* Check if subscriber exists and print IMEI */
+	} else
 		LOGP(DMAIN, LOGL_INFO, "IMSI='%s': has IMEI = %s (consider setting 'store-imei')\n", gsup->imsi, imei);
-		struct hlr_subscriber subscr;
-		if (db_subscr_get_by_imsi(g_hlr->dbc, gsup->imsi, &subscr) < 0) {
-			gsup_send_err_reply(conn, gsup->imsi, gsup->message_type, GMM_CAUSE_INV_MAND_INFO);
-			return -1;
-		}
-	}
 
 	/* Accept all IMEIs */
 	gsup_reply.imei_result = OSMO_GSUP_IMEI_RESULT_ACK;
+
+	/* lu-ignore-nam-cs: use Check IMEI to do a late check for CS/PS enabled. This would usually be done in the LU
+	 * REQ, but then the ME will immediatelly disconnect without sending the IMEI. */
+	if (g_hlr->lu_ignore_nam_cs && !subscr.nam_cs && !subscr.nam_ps) {
+		LOGP(DAUC, LOGL_DEBUG, "IMSI='%s': pretending that the IMEI is not allowed, because subscriber"
+				" has both CS and PS NAM disabled (lu-ignore-nam-cs)", gsup->imsi);
+		gsup_reply.imei_result = OSMO_GSUP_IMEI_RESULT_NACK;
+	}
+
+	/* Send response */
 	gsup_reply.message_type = OSMO_GSUP_MSGT_CHECK_IMEI_RESULT;
 	msg_out = msgb_alloc_headroom(1024+16, 16, "GSUP Check_IMEI response");
 	memcpy(gsup_reply.imsi, gsup->imsi, sizeof(gsup_reply.imsi));

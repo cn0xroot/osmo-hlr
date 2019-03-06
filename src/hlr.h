@@ -54,6 +54,7 @@ struct hlr {
 
 	bool store_imei;
 	bool create_subscr_on_demand;
+	bool lu_ignore_nam_cs;
 };
 
 extern struct hlr *g_hlr;
