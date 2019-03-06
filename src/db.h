@@ -118,7 +118,7 @@ struct sub_auth_data_str {
 	} u;
 };
 
-int db_subscr_create(struct db_context *dbc, const char *imsi);
+int db_subscr_create(struct db_context *dbc, const char *imsi, int nam_cs, int nam_ps);
 int db_subscr_delete_by_id(struct db_context *dbc, int64_t subscr_id);
 
 int db_subscr_update_msisdn_by_imsi(struct db_context *dbc, const char *imsi,
