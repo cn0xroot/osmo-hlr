@@ -44,9 +44,11 @@
 /*! Add new subscriber record to the HLR database.
  * \param[in,out] dbc  database context.
  * \param[in] imsi  ASCII string of IMSI digits, is validated.
+ * \param[in] nam_cs  CS Network access mode (1: enable, 0: disable)
+ * \param[in] nam_ps  PS Network access mode (1: enable, 0: disable)
  * \returns 0 on success, -EINVAL on invalid IMSI, -EIO on database error.
  */
-int db_subscr_create(struct db_context *dbc, const char *imsi)
+int db_subscr_create(struct db_context *dbc, const char *imsi, int nam_cs, int nam_ps)
 {
 	sqlite3_stmt *stmt;
 	int rc;
@@ -60,6 +62,10 @@ int db_subscr_create(struct db_context *dbc, const char *imsi)
 	stmt = dbc->stmt[DB_STMT_SUBSCR_CREATE];
 
 	if (!db_bind_text(stmt, "$imsi", imsi))
+		return -EIO;
+	if (!db_bind_int(stmt, "$nam_cs", nam_cs))
+		return -EIO;
+	if (!db_bind_int(stmt, "$nam_ps", nam_ps))
 		return -EIO;
 
 	/* execute the statement */
