@@ -67,3 +67,18 @@ transceiving only RAND and SRES, may be applicable. (See 3GPP TS 33.102, chapter
 |ms_purged_ps|1|3GPP TS 23.008 chapter 2.7.6
 |===
 
+=== Configuring the Subscribers Create on Demand Feature
+
+Usually a HLR will only allow devices on the network, which are already in the
+HLR database. But OsmoHLR can also be configured to automatically create new
+entries for new devices, with the subscribers-create-on-demand VTY option.
+
+After a subscriber has been added automatically, it will get disconnected from
+the network. The operator needs to assign a MSISDN and enable PS/CS NAM, before
+the subscriber can actually use the network.
+
+Oftentimes it is hard to know which IMSI belongs to which person, but the IMEI
+is readily available. With a few more configuration options, it is possible to
+extend the subscriber on demand entries with the respective IMEIs: store-imei
+and lu-ignore-nam-cs. You must also enable IMEI checking in the MSC, for OsmoMSC
+this can be done with the check-imei-rqd VTY option.
