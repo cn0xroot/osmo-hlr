@@ -155,7 +155,7 @@ static void subscr_create_on_demand(const char *imsi) {
 		return;
 
 	LOGP(DMAIN, LOGL_INFO, "IMSI='%s': Creating subscriber on demand\n", imsi);
-	rc = db_subscr_create(g_hlr->dbc, imsi, 0, 0);
+	rc = db_subscr_create(g_hlr->dbc, imsi, 1, 1); /* Allow both CS and PS domains by default */
 	if (rc)
 		LOGP(DMAIN, LOGL_ERROR, "Failed to create subscriber on demand (rc=%d): IMSI='%s'\n", rc, imsi);
 }
