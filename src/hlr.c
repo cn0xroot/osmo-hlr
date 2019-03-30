@@ -148,7 +148,8 @@ osmo_hlr_subscriber_update_notify(struct hlr_subscriber *subscr)
 	}
 }
 
-static void subscr_create_on_demand(const char *imsi) {
+static void subscr_create_on_demand(const char *imsi)
+{
 	int rc;
 
 	if (!g_hlr->create_subscr_on_demand)
