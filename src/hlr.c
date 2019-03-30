@@ -151,7 +151,9 @@ osmo_hlr_subscriber_update_notify(struct hlr_subscriber *subscr)
 static void subscr_create_on_demand(const char *imsi) {
 	int rc;
 
-	if (!g_hlr->create_subscr_on_demand || db_subscr_exists_by_imsi(g_hlr->dbc, imsi) == 0)
+	if (!g_hlr->create_subscr_on_demand)
+		return;
+	if (db_subscr_exists_by_imsi(g_hlr->dbc, imsi) == 0)
 		return;
 
 	LOGP(DMAIN, LOGL_INFO, "IMSI='%s': Creating subscriber on demand\n", imsi);
